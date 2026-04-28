@@ -5,6 +5,18 @@ import { z } from 'zod'
 
 const router = Router()
 
+function getAuthCookieOptions() {
+  const isProduction = process.env.NODE_ENV === 'production'
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: (isProduction ? 'none' : 'lax') as 'none' | 'lax',
+    domain: process.env.COOKIE_DOMAIN || undefined,
+    path: '/',
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  }
+}
+
 // Schémas de validation
 const loginSchema = z.object({
   email: z.string().email('Email invalide'),
@@ -50,12 +62,7 @@ router.post('/login', async (req, res) => {
     })
 
     // Définir le cookie
-    res.cookie('token', token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 jours
-    })
+    res.cookie('token', token, getAuthCookieOptions())
 
     // Créer un log
     await prisma.log.create({
@@ -91,7 +98,13 @@ router.post('/login', async (req, res) => {
 router.post('/logout', authenticateToken, async (req: AuthenticatedRequest, res) => {
   try {
     // Supprimer le cookie
-    res.clearCookie('token')
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax') as 'none' | 'lax',
+      domain: process.env.COOKIE_DOMAIN || undefined,
+      path: '/',
+    })
     
     // Créer un log
     await prisma.log.create({

@@ -32,6 +32,7 @@ if (envResult.error) {
 
 const app = express()
 const PORT = process.env.PORT || 3001
+app.set('trust proxy', 1)
 
 // Configuration CORS
 const allowedOrigins = new Set([

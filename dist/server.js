@@ -30,6 +30,7 @@ if (envResult.error) {
 }
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3001;
+app.set('trust proxy', 1);
 const allowedOrigins = new Set([
     process.env.FRONTEND_URL || 'http://localhost:3000',
     'https://actionhub.globalsos.org',

@@ -5,6 +5,17 @@ const auth_1 = require("../lib/auth");
 const auth_2 = require("../middleware/auth");
 const zod_1 = require("zod");
 const router = (0, express_1.Router)();
+function getAuthCookieOptions() {
+    const isProduction = process.env.NODE_ENV === 'production';
+    return {
+        httpOnly: true,
+        secure: isProduction,
+        sameSite: (isProduction ? 'none' : 'lax'),
+        domain: process.env.COOKIE_DOMAIN || undefined,
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    };
+}
 const loginSchema = zod_1.z.object({
     email: zod_1.z.string().email('Email invalide'),
     password: zod_1.z.string().min(1, 'Mot de passe requis')
@@ -36,12 +47,7 @@ router.post('/login', async (req, res) => {
             email: user.email,
             role: user.role
         });
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: process.env.NODE_ENV === 'production',
-            sameSite: 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000
-        });
+        res.cookie('token', token, getAuthCookieOptions());
         await auth_1.prisma.log.create({
             data: {
                 action: 'LOGIN',
@@ -70,7 +76,13 @@ router.post('/login', async (req, res) => {
 });
 router.post('/logout', auth_2.authenticateToken, async (req, res) => {
     try {
-        res.clearCookie('token');
+        res.clearCookie('token', {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: (process.env.NODE_ENV === 'production' ? 'none' : 'lax'),
+            domain: process.env.COOKIE_DOMAIN || undefined,
+            path: '/',
+        });
         await auth_1.prisma.log.create({
             data: {
                 action: 'LOGOUT',
