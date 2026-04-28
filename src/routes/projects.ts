@@ -99,17 +99,23 @@ router.get('/', authenticateToken, requireRole(['COORDINATOR', 'MEAL', 'ADMIN'])
     const { status, search, startDate, endDate } = req.query
     const where: Prisma.ProjectWhereInput = {}
 
-    if (status) where.status = status
-    if (search) {
+    if (typeof status === 'string' && status.trim().length > 0) {
+      where.status = status
+    }
+    if (typeof search === 'string' && search.trim().length > 0) {
       where.OR = [
-        { title: { contains: String(search), mode: 'insensitive' } },
-        { description: { contains: String(search), mode: 'insensitive' } },
+        { title: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
       ]
     }
-    if (startDate || endDate) {
+    if (typeof startDate === 'string' || typeof endDate === 'string') {
       where.startDate = {}
-      if (startDate) where.startDate.gte = new Date(String(startDate))
-      if (endDate) where.startDate.lte = new Date(String(endDate))
+      if (typeof startDate === 'string' && startDate.trim().length > 0) {
+        where.startDate.gte = new Date(startDate)
+      }
+      if (typeof endDate === 'string' && endDate.trim().length > 0) {
+        where.startDate.lte = new Date(endDate)
+      }
     }
 
     if (req.user!.role === 'MEAL') where.mealId = req.user!.userId
