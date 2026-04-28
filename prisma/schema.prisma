@@ -1,0 +1,337 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  COORDINATOR
+  FINANCE
+  COMMUNICATION
+  LOGISTICS
+  MEAL
+  ADMIN
+}
+
+enum DemandeType {
+  ACHAT
+  DEPENSE
+  DOCUMENT
+  PUBLICATION
+}
+
+enum DemandeStatus {
+  EN_ATTENTE
+  VALIDE
+  REFUSE
+  EXECUTE
+}
+
+enum DocumentStatus {
+  EN_ATTENTE
+  VALIDE
+  REFUSE
+  CORRIGE
+}
+
+enum PublicationStatus {
+  BROUILLON
+  EN_ATTENTE
+  VALIDE
+  REFUSE
+}
+
+enum IndicatorDataType {
+  QUANTITATIVE
+  QUALITATIVE
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      UserRole
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  demandes     Demande[]
+  documents    Document[]
+  publications Publication[]
+  visites      Visite[]
+  transactions Transaction[]
+  logs         Log[]
+  comments     Comment[]
+  coordinatedProjects Project[] @relation("ProjectCoordinator")
+  mealProjects        Project[] @relation("ProjectMeal")
+
+  @@map("users")
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  title       String
+  location    String?
+  description String?
+  status      String   @default("EN_COURS")
+  baseline    Float    @default(0)
+  target      Float
+  current     Float    @default(0)
+  budget      Float    @default(0)
+  indicatorDataType IndicatorDataType @default(QUANTITATIVE)
+  kpiPrimaryColor   String            @default("#2563eb")
+  kpiSecondaryColor String            @default("#9333ea")
+  kpiTertiaryColor  String            @default("#16a34a")
+  startDate   DateTime
+  endDate     DateTime?
+
+  coordinatorId String?
+  coordinator   User?     @relation("ProjectCoordinator", fields: [coordinatorId], references: [id])
+  mealId        String?
+  meal          User?     @relation("ProjectMeal", fields: [mealId], references: [id])
+
+  outputs   ProjectOutput[]
+  outcomes  ProjectOutcome[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("projects")
+}
+
+model ProjectOutput {
+  id          String  @id @default(cuid())
+  name        String
+  description String?
+  baseline    Float   @default(0)
+  target      Float
+  current     Float   @default(0)
+  unit        String?
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  indicators OutputIndicator[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("project_outputs")
+}
+
+model OutputIndicator {
+  id              String   @id @default(cuid())
+  name            String
+  baseline        Float    @default(0)
+  target          Float
+  value           Float
+  unit            String?
+  dataType        IndicatorDataType @default(QUANTITATIVE)
+  showAsKpi       Boolean           @default(true)
+  kpiColor        String?
+  measurementDate DateTime @default(now())
+
+  outputId String
+  output   ProjectOutput @relation(fields: [outputId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("output_indicators")
+}
+
+model ProjectOutcome {
+  id              String   @id @default(cuid())
+  name            String
+  description     String?
+  baseline        Float    @default(0)
+  target          Float
+  value           Float
+  unit            String?
+  measurementDate DateTime @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("project_outcomes")
+}
+
+model Demande {
+  id          String        @id @default(cuid())
+  type        DemandeType
+  status      DemandeStatus @default(EN_ATTENTE)
+  description String
+  items       Json? // Array of {name, quantity, price}
+  totalAmount Float?
+  justificatif String? // File URL
+  motifRefus  String?
+  
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  
+  comments  Comment[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("demandes")
+}
+
+model Document {
+  id          String         @id @default(cuid())
+  title       String
+  fileUrl     String
+  status      DocumentStatus @default(EN_ATTENTE)
+  type        String // "administratif", "financier", "rh"
+  annotations String?
+  motifRefus  String?
+  
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  
+  comments  Comment[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("documents")
+}
+
+model Publication {
+  id          String            @id @default(cuid())
+  title       String
+  content     String
+  imageUrl    String
+  type        String            @default("ARTICLE")
+  status      PublicationStatus @default(BROUILLON)
+  motifRefus  String?
+  
+  userId    String
+  user      User      @relation(fields: [userId], references: [id])
+  
+  comments  Comment[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("publications")
+}
+
+model Partenaire {
+  id          String   @id @default(cuid())
+  name        String
+  contact     String
+  email       String?
+  phone       String?
+  type        String?  // "ONG", "ENTREPRISE", "INSTITUTION", etc.
+  domaine     String
+  contratUrl  String?
+  active      Boolean  @default(true)
+  
+  rapports    Rapport[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("partenaires")
+}
+
+model Rapport {
+  id           String   @id @default(cuid())
+  title        String
+  content      String
+  periode      String // "Janvier 2025", "Q1 2025"
+  fileUrl      String?
+  
+  partenaireId String
+  partenaire   Partenaire @relation(fields: [partenaireId], references: [id])
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("rapports")
+}
+
+model Visite {
+  id          String    @id @default(cuid())
+  nom         String
+  postnom     String
+  motif       String
+  hote        String
+  type        String    @default("TERRAIN") // TERRAIN, INSPECTION, RENCONTRE, FORMATION
+  status      String    @default("PLANIFIEE") // PLANIFIEE, EN_COURS, TERMINEE, ANNULEE
+  heureArrivee DateTime @default(now())
+  heureSortie  DateTime?
+  
+  userId      String
+  user        User      @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("visites")
+}
+
+model Transaction {
+  id              String   @id @default(cuid())
+  type            String // "entree", "sortie"
+  montant         Float
+  description     String
+  dateTransaction DateTime
+  modePaiement    String?
+  reference       String?
+  
+  demandeId       String?
+  
+  userId          String
+  user            User     @relation(fields: [userId], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("transactions")
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  demandeId     String?
+  demande       Demande? @relation(fields: [demandeId], references: [id])
+  
+  documentId    String?
+  document      Document? @relation(fields: [documentId], references: [id])
+  
+  publicationId String?
+  publication   Publication? @relation(fields: [publicationId], references: [id])
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("comments")
+}
+
+model Log {
+  id        String   @id @default(cuid())
+  action    String
+  module    String
+  details   String?
+  ipAddress String?
+  
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  
+  createdAt DateTime @default(now())
+
+  @@map("logs")
+}
